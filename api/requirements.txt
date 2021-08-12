@@ -1,0 +1,7 @@
+# Flask==2.0.1
+# Celery==5.1.2
+# Redis==3.5.3
+
+flask
+redis
+celery

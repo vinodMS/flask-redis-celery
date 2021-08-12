@@ -1,0 +1,34 @@
+version: "3"
+
+services:
+  web:
+    container_name: web
+    build: ./api
+    ports:
+      - "5000:5000"
+    links:
+      - redis
+    depends_on:
+      - redis
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=app.py
+    volumes:
+      - ./api:/app
+
+  redis:
+    image: "redis:alpine"
+    hostname: redis
+
+  worker:
+    build:
+      context: ./api
+    hostname: worker
+    entrypoint: celery
+    command: -A app.celery worker --loglevel=info -E --pool='solo'
+    volumes:
+      - ./api:/app
+    links:
+      - redis
+    depends_on:
+      - redis
