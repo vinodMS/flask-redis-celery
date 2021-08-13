@@ -5,7 +5,7 @@ from flask.wrappers import Response
 # from redis import Redis
 
 
-# Your API definition
+#--------------------------- App Setup ---------------------------#
 app = Flask(__name__)
 app.config['CELERY_BROKER_URL'] = 'redis://redis:6379/0'
 app.config['CELERY_RESULT_BACKEND'] = 'redis://redis:6379/0'
@@ -21,7 +21,7 @@ celery.conf.update(app.config)
 # redis = Redis(host='redis', port=6379)
 
 
-# Celery Tasks
+#--------------------------- Celery Tasks ---------------------------#
 @celery.task()
 def add(x, y):
     return x + y
@@ -45,6 +45,7 @@ def on_chord_error(res):
     return False
 
 
+#--------------------------- Flask routes ---------------------------#
 @app.route('/')
 def hello_world():
     # redis.incr('hits')
@@ -55,8 +56,8 @@ def hello_world():
 def signature_task():
     """ Test Signatures """
 
-    x = int(request.form.get('x'))
-    y = int(request.form.get('y'))
+    x = request.form.get('x')
+    y = request.form.get('y')
 
     if None in [x, y]:
         return "Please specify x,y values as form data"
@@ -64,7 +65,7 @@ def signature_task():
     # result = add.delay(4, 4)
     # result = add.s(2, 2)()
     # result = add.apply_async((2, 2), countdown=1) same as below
-    result = add.signature((x, y), countdown=1).apply_async()
+    result = add.signature((int(x), int(y)), countdown=1).apply_async()
 
     return '{0} + {1} is {2}'.format(x, y, result.get())
 
@@ -134,5 +135,6 @@ def chord_task():
     return 'Result is {0}'.format(result.get())
 
 
+#--------------------------- Main Run ---------------------------#
 if __name__ == '__main__':
     app.run(host="0.0.0.0", debug=True)
