@@ -1,4 +1,6 @@
 import re
+import uuid
+
 from flask import Flask, request
 from celery import Celery, chain, chord, group
 from flask.wrappers import Response
@@ -13,7 +15,7 @@ app.config['CELERY_RESULT_BACKEND'] = 'redis://redis:6379/0'
 celery = Celery(
     app.name,
     backend=app.config['CELERY_RESULT_BACKEND'],
-    broker=app.config['CELERY_BROKER_URL']
+    broker=app.config['CELERY_BROKER_URL'],
 )
 celery.config_from_object("celeryconfig")
 celery.conf.update(app.config)
@@ -41,8 +43,102 @@ def xsum(results):
 
 @celery.task()
 def on_chord_error(res):
-    print("we've hit an error %s" % res)
+    # print("we've hit an error %s" % res)
+    app.logger.error("we've hit an error %s" % res)
     return False
+
+
+#----------------------- Advance Celery Tasks -----------------------#
+@celery.task(
+    bind=True,
+    max_tries=2,
+    name="batch-start",
+    ignore_result=True
+)
+def batch(self, start, end, step, batch_id):
+    # important to pass self as the first variable when bind=True
+    app.logger.info("Starting calculation")
+    try:
+        callback = batch_run_main.s(batch_id).on_error(
+            batch_failed.si(batch_id))
+        header = [batch_validate_data.s(batch_id, val)
+                  for val in range(start, end, step)]
+        chord(header)(callback)
+    except Exception as e:
+        app.logger.error("exception raised")
+        # TODO: send task currently fails, as the task is not found
+        # celery.send_task(batch_failed(batch_id))
+
+
+@celery.task(
+    bind=True,
+    max_tries=2,
+    name="batch-validate-data"
+)
+def batch_validate_data(self, batch_id, val):
+    """
+        Checks if the given number is an odd/even number. 
+        Returns false if it's an odd number, as we are 
+        expecting even number. 
+
+    Parameters
+    ----------
+    batch_id : int
+        unique batch id to identify the full run
+    val : int
+        value to be checked
+
+    Returns
+    -------
+    bool
+        True if it's an even number
+    """
+
+    app.logger.info(
+        "Starting batch validate task with id {0}".format(batch_id))
+    return val % 2 == 0
+
+
+@celery.task(
+    bind=True,
+    max_tries=2,
+    name="batch-run_main"
+)
+def batch_run_main(self, results, batch_id):
+    app.logger.info("Main run of batch ID {0} starts now".format(batch_id))
+    app.logger.info(results)
+
+    if False in results:
+        app.logger.error("Run failed, odd number found")
+        # TODO: send task currently fails, as the task is not found
+        # celery.send_task(batch_failed(batch_id))
+    else:
+        # TODO: before we do another chord, we can do some grouped or chained tasks here. 
+        callback = batch_finished.si(batch_id).on_error(
+            batch_failed.si(batch_id))
+        # header = [batch_validate_data.s(batch_id, val)
+        #           for val in range(start, end, step)]
+        # chord(header)(callback)
+        app.logger.info("continue further")
+
+
+@celery.task(
+    bind=True,
+    max_tries=2,
+    name="batch-failed"
+)
+def batch_failed(self, batch_id):
+    app.logger.error("Calculation with batch ID {0} failed".format(batch_id))
+
+
+@celery.task(
+    bind=True,
+    max_tries=2,
+    name="batch-finished",
+)
+def batch_finished(self, batch_id):
+    app.logger.info(
+        "Calculation succesfully completed with batch ID {0}.".format(batch_id))
 
 
 #--------------------------- Flask routes ---------------------------#
@@ -133,6 +229,16 @@ def chord_task():
     #           | xsum.s().on_error(on_chord_error.s())).delay()
 
     return 'Result is {0}'.format(result.get())
+
+
+@app.route('/batch')
+def batch_start() -> str:
+    "Entry point to the batch call"
+    start, end, step = 0, 10, 2
+    batch_id = uuid.uuid1()  # Generate unique batch ID
+
+    result = batch.s(start, end, step, batch_id.int).apply_async()
+    return 'Task ID is - {0}'.format(result)
 
 
 #--------------------------- Main Run ---------------------------#

@@ -25,7 +25,7 @@ services:
       context: ./api
     hostname: worker
     entrypoint: celery
-    command: -A app.celery worker --loglevel=info -E --pool='solo'
+    command: -A app.celery worker --loglevel=info -E --pool='solo' # set --loglevel=debug to see detailed celery error
     volumes:
       - ./api:/app
     links:
