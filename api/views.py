@@ -12,13 +12,13 @@ from batch_tasks import batch
 
 
 @app.route('/')
-def hello_world():
+def hello_world() -> str:
     # redis.incr('hits')
     return 'This is hello world'
 
 
-@app.route('/sig_task')
-def signature_task():
+@app.post('/basic-task')
+def signature_task() -> str:
     """ Test Signatures """
 
     x = request.form.get('x')
@@ -35,8 +35,8 @@ def signature_task():
     return '{0} + {1} is {2}'.format(x, y, result.get())
 
 
-@app.route('/callback_task')
-def callback_task():
+@app.post('/callback-task')
+def callback_task() -> str:
     """ Test Callback and partials """
 
     x = request.form.get('x')
@@ -50,8 +50,8 @@ def callback_task():
     return 'Callback succesfully initiated, check celery log for results'
 
 
-@app.route('/chain_task')
-def chain_task():
+@app.post('/chain-task')
+def chain_task() -> str:
     """ Test Chainback """
 
     a = request.form.get('a')
@@ -68,8 +68,8 @@ def chain_task():
     return 'Running this - chain(add.s({0}, {1}), add.s({2}), add.s({3}))() returns {4}'.format(a, x, y, z, result.get())
 
 
-@app.route('/simple_chord_task')
-def simple_chord_task():
+@app.post('/simple-chord-task')
+def simple_chord_task() -> str:
     """ Test Simple Chord """
 
     range_val = request.form.get('range')
@@ -81,8 +81,8 @@ def simple_chord_task():
     return 'Running this - chord((add.s(i, i) for i in range(int(range_val))), xsum.s())() returns {0}'.format(result.get())
 
 
-@app.route('/chord_task')
-def chord_task():
+@app.post('/chord-task')
+def chord_task() -> str:
     """ Test Chord and on error """
 
     range_val = request.form.get('range')
@@ -102,10 +102,10 @@ def chord_task():
 
 #--------------------------- Advance Celery routes ---------------------------#
 
-@app.route('/batch')
+@app.post('/batch-start')
 def batch_start() -> str:
     "Entry point to the batch call"
-    start, end, step = 0, 10, 2
+    start, end, step = 0, 890, 60
     batch_id = uuid.uuid1()  # Generate unique batch ID
 
     result = batch.s(start, end, step, batch_id.int).apply_async()
