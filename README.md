@@ -60,4 +60,5 @@ def new_route():
 ## TO:DO
 1. Add an example of redis caching
 2. Add an example of passing arguments that are not generic python data types
-3. Add unit and integration tests
+3. Add examples of other primitives (group, start, map, etc..) 
+4. Add unit and integration tests
