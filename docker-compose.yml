@@ -6,8 +6,6 @@ services:
     build: ./api
     ports:
       - "5000:5000"
-    links:
-      - redis
     depends_on:
       - redis
     environment:
@@ -18,7 +16,6 @@ services:
 
   redis:
     image: "redis:alpine"
-    hostname: redis
 
   worker:
     build:
@@ -28,7 +25,5 @@ services:
     command: -A app.celery worker --loglevel=info -E --pool='solo' # set --loglevel=debug to see detailed celery error
     volumes:
       - ./api:/app
-    links:
-      - redis
     depends_on:
       - redis
