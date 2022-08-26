@@ -1,6 +1,10 @@
 # api/calculator.py
+from urllib.error import URLError
+import os
 
 import pandas as pd
+
+from app import app
 
 
 class Calculator:
@@ -42,7 +46,11 @@ class Calculator:
             by default None
         """
         
-        self._dataset = pd.read_csv(self._source)
+        try:
+            self._dataset = pd.read_csv(self._source)
+        except URLError as err:
+            app.logger.warning(f'Could not access url, fetching local copy {err}')
+            self._dataset = pd.read_csv(os.path.abspath('data/titanic.csv'))
     
         # select a subset of the data if start and max are given
         if start and max:
