@@ -1,20 +1,56 @@
 # api/views.py
+import json
 import uuid
+from typing import List, Optional, Dict
 
-from flask import Flask, request
-from celery import chain, chord, group
+from flask import request, jsonify
+from celery import chain, chord
 
-from app import app
+from app import app, celery
 from tasks import xsum, add, sub
 from batch_tasks import batch
 
-#--------------------------- Simple celery routes ---------------------------#
+
+# --------------------------- Simple celery routes ---------------------------#
 
 
 @app.route('/')
 def hello_world() -> str:
     # redis.incr('hits')
     return 'This is hello world'
+
+
+@app.route('/healthz')
+def check_health() -> json:
+    api_info = {
+        "build_id": 1,
+        "contact": {
+            "email": "vinod@test_email.com",
+            "full_name": "Test Owner",
+            "name": "Test Celery",
+        },
+        "description": "Test Description"
+    }
+
+    return jsonify(
+        api_info
+    )
+
+
+@app.route('/readyz')
+def check_readiness():
+    response = "not ready"
+
+    try:
+        celery_ping: List[Optional[Dict[str, str]]] = celery.control.ping(
+            timeout=0.1
+        )
+        print(celery_ping)
+        response = "ping received" if len(celery_ping) > 0 else "ping not received"
+    except Exception as e:
+        print(e)
+
+    return response
 
 
 @app.post('/basic-task')
@@ -65,7 +101,8 @@ def chain_task() -> str:
     # () at the end means that the chain will execute the task inline in the current process:
     result = chain(add.s(int(a), int(x)), add.s(int(y)), add.s(int(z)))()
     # result = (add.s(int(a), int(x)) | add.s(int(y)) | add.s(int(z)))().get() same as above
-    return 'Running this - chain(add.s({0}, {1}), add.s({2}), add.s({3}))() returns {4}'.format(a, x, y, z, result.get())
+    return 'Running this - chain(add.s({0}, {1}), add.s({2}), add.s({3}))() returns {4}'.format(a, x, y, z,
+                                                                                                result.get())
 
 
 @app.post('/simple-chord-task')
@@ -78,7 +115,8 @@ def simple_chord_task() -> str:
         return "Please specify a value for range (range=10)"
 
     result = chord((add.s(i, i) for i in range(int(range_val))), xsum.s())()
-    return 'Running this - chord((add.s(i, i) for i in range(int(range_val))), xsum.s())() returns {0}'.format(result.get())
+    return f'Running this - chord((add.s(i, i) for i in range(int(range_val))), xsum.s())() returns {0}'.format(
+        result.get())
 
 
 @app.post('/chord-task')
@@ -100,7 +138,7 @@ def chord_task() -> str:
     return 'Result is {0}'.format(result.get())
 
 
-#--------------------------- Advance Celery routes ---------------------------#
+# --------------------------- Advance Celery routes ---------------------------#
 
 @app.post('/batch-start')
 def batch_start() -> str:
