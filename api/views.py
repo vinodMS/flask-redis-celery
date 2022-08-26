@@ -45,10 +45,10 @@ def check_readiness():
         celery_ping: List[Optional[Dict[str, str]]] = celery.control.ping(
             timeout=0.1
         )
-        print(celery_ping)
+        app.logger.info(celery_ping)
         response = "ping received" if len(celery_ping) > 0 else "ping not received"
-    except Exception as e:
-        print(e)
+    except Exception as err:
+        app.logger.error(err)
 
     return response
 
