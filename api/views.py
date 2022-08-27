@@ -7,7 +7,7 @@ from flask import request, jsonify
 from celery import chain, chord
 
 from app import app, celery
-from tasks import xsum, add, sub
+from tasks import xsum, add, sub, auto_retry_exception
 from batch_tasks import batch
 
 
@@ -82,8 +82,8 @@ def callback_task() -> str:
     if None in [x, y, z]:
         return "Please specify x,y,z values as form data"
 
-    result = add.apply_async((int(x), int(y)), link=sub.s(int(z)))
-    return 'Callback succesfully initiated, check celery log for results'
+    add.apply_async((int(x), int(y)), link=sub.s(int(z)))
+    return 'Callback successfully initiated, check celery log for results'
 
 
 @app.post('/chain-task')
@@ -136,6 +136,15 @@ def chord_task() -> str:
     #           | xsum.s().on_error(on_chord_error.s())).delay()
 
     return 'Result is {0}'.format(result.get())
+
+
+@app.post('/retry_exception')
+def retry_exception() -> str:
+    """ Test retry on exception decorator arg"""
+
+    auto_retry_exception.s().apply_async()
+
+    return 'Task invoked, check celery log for results'
 
 
 # --------------------------- Advance Celery routes ---------------------------#
