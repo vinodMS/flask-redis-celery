@@ -6,7 +6,8 @@ from celery import chord
 from app import app, celery
 from calculator import Calculator
 
-#----------------------- Advance Celery Tasks -----------------------#
+
+# ----------------------- Advance Celery Tasks -----------------------#
 
 
 @celery.task(
@@ -16,15 +17,15 @@ from calculator import Calculator
     ignore_result=True
 )
 def batch(
-        self, 
-        start: int, 
-        end: int, 
+        self,
+        start: int,
+        end: int,
         batch: int,
         batch_id: int
-        ):
+):
     # important to pass self as the first variable when bind=True
     app.logger.info("Starting calculation")
-    
+
     try:
         callback = batch_run_main.s(batch_id).on_error(
             batch_failed.si(batch_id))
@@ -32,8 +33,8 @@ def batch(
                   for val in range(start, end, batch)]
         chord(header)(callback)
     except Exception as e:
-        app.logger.error("exception raised")
-        celery.send_task("batch-failed",args=[batch_id,])
+        app.logger.error(f"exception raised {e}")
+        celery.send_task("batch-failed", args=[batch_id, ])
 
 
 @celery.task(
@@ -59,10 +60,10 @@ def batch_run_main(self, results: List, batch_id: int):
 
     if False in results:
         app.logger.error("Run failed")
-        celery.send_task("batch-failed",args=[batch_id,])
+        celery.send_task("batch-failed", args=[batch_id, ])
     else:
         app.logger.info("Run success")
-        celery.send_task("batch-finished",args=[batch_id,])
+        celery.send_task("batch-finished", args=[batch_id, ])
 
 
 @celery.task(
@@ -81,5 +82,4 @@ def batch_failed(self, batch_id: int):
 )
 def batch_finished(self, batch_id: int):
     app.logger.info(
-        "Calculation succesfully completed with batch ID {0}.".format(batch_id))
-
+        "Calculation successfully completed with batch ID {0}.".format(batch_id))
